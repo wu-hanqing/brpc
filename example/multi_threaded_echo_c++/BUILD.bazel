@@ -1,0 +1,39 @@
+load("//:bazel/brpc.bzl", "brpc_proto_library")
+
+brpc_proto_library(
+    name = "cc_echo_proto",
+    srcs = [
+        "echo.proto",
+    ],
+    deps = [
+        "@com_google_protobuf//:cc_wkt_protos"
+    ],
+)
+
+cc_binary(
+    name = "client",
+    srcs = [
+        "client.cpp"
+    ],
+    deps = [
+        "//:brpc",
+        ":cc_echo_proto",
+    ],
+    # includes = [
+    #     "example/multi_threaded_echo_c++",
+    # ],
+)
+
+cc_binary(
+    name = "server",
+    srcs = [
+        "server.cpp"
+    ],
+    deps = [
+        "//:brpc",
+        ":cc_echo_proto",
+    ],
+    # includes = [
+    #     "example/multi_threaded_echo_c++",
+    # ],
+)

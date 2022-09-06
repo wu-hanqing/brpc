@@ -17,9 +17,10 @@
 #include <gflags/gflags.h>
 #include <butil/logging.h>
 #include <brpc/server.h>
-#include "echo.pb.h"
+#include "example/multi_threaded_echo_c++/echo.pb.h"
 
 DEFINE_bool(echo_attachment, true, "Echo attachment as well");
+DEFINE_int32(attachment_size, 16 * 1024, "xxx");
 DEFINE_int32(port, 8002, "TCP Port of this server");
 DEFINE_int32(idle_timeout_s, -1, "Connection will be closed if there is no "
              "read/write operations during the last `idle_timeout_s'");
@@ -35,12 +36,16 @@ namespace example {
 // Your implementation of EchoService
 class EchoServiceImpl : public EchoService {
 public:
-    EchoServiceImpl() {}
+    EchoServiceImpl() {
+        attachment.resize(FLAGS_attachment_size, 'a');
+    }
     ~EchoServiceImpl() {};
     void Echo(google::protobuf::RpcController* cntl_base,
               const EchoRequest* request,
               EchoResponse* response,
               google::protobuf::Closure* done) {
+        butil::Timer timer;
+        timer.start();
         brpc::ClosureGuard done_guard(done);
         brpc::Controller* cntl =
             static_cast<brpc::Controller*>(cntl_base);
@@ -48,9 +53,14 @@ public:
         // Echo request and its attachment
         response->set_message(request->message());
         if (FLAGS_echo_attachment) {
-            cntl->response_attachment().append(cntl->request_attachment());
+            cntl->response_attachment().append(attachment);
         }
+        timer.stop();
+        latency << timer.u_elapsed();
     }
+// private:
+    bvar::LatencyRecorder latency{"service_latency"};
+    std::string attachment;
 };
 }  // namespace example
 
@@ -99,6 +109,11 @@ int main(int argc, char* argv[]) {
     }
 
     // Wait until Ctrl-C is pressed, then Stop() and Join() the server.
-    server.RunUntilAskedToQuit();
+    // server.RunUntilAskedToQuit();
+    while (!brpc::IsAskedToQuit()) {
+        bthread_usleep(1000 * 1000);
+        LOG(INFO) << "Server process latency(us)="
+                  << echo_service_impl.latency.latency(1);
+    }
     return 0;
 }
