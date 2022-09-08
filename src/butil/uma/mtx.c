@@ -23,7 +23,7 @@
 
 #define INVALID_PTHREAD 0
 
-void mtx_init(struct mtx *m, const char *name, const char *type, int opts)
+void uma_mtx_init(struct uma_mtx *m, const char *name, const char *type, int opts)
 {
 	pthread_mutexattr_t attr;
 
@@ -34,7 +34,7 @@ void mtx_init(struct mtx *m, const char *name, const char *type, int opts)
 	m->mtx_owner = INVALID_PTHREAD;
 }
 
-int mtx_trylock(struct mtx *m)
+int uma_mtx_trylock(struct uma_mtx *m)
 {
 	if (pthread_mutex_trylock(&m->mtx_lock) == 0) {
 		m->mtx_owner = pthread_self();
@@ -44,19 +44,19 @@ int mtx_trylock(struct mtx *m)
 	return 0;
 }
 
-void mtx_lock(struct mtx *m)
+void uma_mtx_lock(struct uma_mtx *m)
 {
 	pthread_mutex_lock(&m->mtx_lock);
 	m->mtx_owner = pthread_self();
 }
 
-void mtx_unlock(struct mtx *m)
+void uma_mtx_unlock(struct uma_mtx *m)
 {
 	m->mtx_owner = INVALID_PTHREAD;
 	pthread_mutex_unlock(&m->mtx_lock);
 }
 
-void mtx_assert(struct mtx *m, int ma)
+void uma_mtx_assert(struct uma_mtx *m, int ma)
 {
 	if (ma & MA_OWNED) {
 		KASSERT(m->mtx_owner == pthread_self(), ("mtx not owned"));
@@ -67,10 +67,15 @@ void mtx_assert(struct mtx *m, int ma)
 	}
 }
 
-void mtx_sleep(pthread_cond_t *cond, struct mtx *m)
+void uma_mtx_sleep(pthread_cond_t *cond, struct uma_mtx *m)
 {
 	m->mtx_owner = INVALID_PTHREAD;
 	pthread_cond_wait(cond, &m->mtx_lock);
 	m->mtx_owner = pthread_self();
+}
+
+void uma_mtx_destroy(struct uma_mtx *m) {
+    m->mtx_owner = INVALID_PTHREAD;
+    pthread_mutex_destroy(&m->mtx_lock);
 }
 

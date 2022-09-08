@@ -130,7 +130,7 @@ static LIST_HEAD(,uma_slab) uma_boot_pages =
     LIST_HEAD_INITIALIZER(uma_boot_pages);
 
 /* This mutex protects the boot time pages list */
-static struct mtx uma_boot_pages_mtx __cache_aligned;
+static struct uma_mtx uma_boot_pages_mtx __cache_aligned;
 
 static struct sx uma_drain_lock;
 static pthread_mutex_t uma_drain_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -884,7 +884,7 @@ zone_drain_wait(uma_zone_t zone, int waitok)
 	while (zone->uz_flags & UMA_ZFLAG_DRAINING) {
 		if (waitok == M_NOWAIT)
 			goto out;
-		mtx_sleep(&zone->uz_cond, zone->uz_lockptr);
+		uma_mtx_sleep(&zone->uz_cond, zone->uz_lockptr);
 	}
 	zone->uz_flags |= UMA_ZFLAG_DRAINING;
 	bucket_cache_drain(zone);
@@ -928,7 +928,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int wait)
 	uint8_t flags;
 	int i;
 
-	mtx_assert(&keg->uk_lock, MA_OWNED);
+	uma_mtx_assert(&keg->uk_lock, MA_OWNED);
 	slab = NULL;
 	mem = NULL;
 
@@ -1030,7 +1030,7 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, uint8_t *pflag, int wait)
 	/*
 	 * Check our small startup cache to see if it has pages remaining.
 	 */
-	mtx_lock(&uma_boot_pages_mtx);
+	uma_mtx_lock(&uma_boot_pages_mtx);
 
 	/* First check if we have enough room. */
 	tmps = LIST_FIRST(&uma_boot_pages);
@@ -1046,11 +1046,11 @@ startup_alloc(uma_zone_t zone, vm_size_t bytes, uint8_t *pflag, int wait)
 			tmps = LIST_FIRST(&uma_boot_pages);
 			LIST_REMOVE(tmps, us_link);
 		}
-		mtx_unlock(&uma_boot_pages_mtx);
+		uma_mtx_unlock(&uma_boot_pages_mtx);
 		*pflag = tmps->us_flags;
 		return (tmps->us_data);
 	}
-	mtx_unlock(&uma_boot_pages_mtx);
+	uma_mtx_unlock(&uma_boot_pages_mtx);
 	if (booted < UMA_STARTUP2)
 		panic("UMA: Increase vm.boot_pages");
 	/*
@@ -1499,7 +1499,7 @@ zone_ctor(void *mem, int size, void *udata, int flags)
 	ZONE_LOCK_INIT(zone, (arg->flags & UMA_ZONE_MTXCLASS));
 	for (sz = sizeof(struct uma_zone) - sizeof(struct uma_cache), cpu = 0;
 	     sz < size; ++cpu, sz += sizeof(struct uma_cache))
-		mtx_init(&zone->uz_cpu[cpu].uc_mtx, "uma cache mtx", "", 0);
+		uma_mtx_init(&zone->uz_cpu[cpu].uc_mtx, "uma cache mtx", "", 0);
 
 	/*
 	 * This is a pure cache zone, no kegs.
@@ -1679,7 +1679,7 @@ zone_dtor(void *arg, int size, void *udata)
 
 	for (sz = sizeof(struct uma_zone) - sizeof(struct uma_cache), cpu = 0;
 	     sz < size; ++cpu, sz += sizeof(struct uma_cache))
-		mtx_destroy(&zone->uz_cpu[cpu].uc_mtx);
+		uma_mtx_destroy(&zone->uz_cpu[cpu].uc_mtx);
 
 
 }
@@ -1752,7 +1752,7 @@ uma_startup(void *bootmem, int boot_pages)
 		slab->us_flags = UMA_SLAB_BOOT;
 		LIST_INSERT_HEAD(&uma_boot_pages, slab, us_link);
 	}
-	mtx_init(&uma_boot_pages_mtx, "UMA boot pages", NULL, MTX_DEF);
+	uma_mtx_init(&uma_boot_pages_mtx, "UMA boot pages", NULL, MTX_DEF);
 
 #ifdef UMA_DEBUG
 	printf("Creating uma zone headers zone and keg.\n");
@@ -1969,10 +1969,10 @@ zone_lock_pair(uma_zone_t a, uma_zone_t b)
 {
 	if (a < b) {
 		ZONE_LOCK(a);
-		mtx_lock_flags(b->uz_lockptr, MTX_DUPOK);
+		uma_mtx_lock_flags(b->uz_lockptr, MTX_DUPOK);
 	} else {
 		ZONE_LOCK(b);
-		mtx_lock_flags(a->uz_lockptr, MTX_DUPOK);
+		uma_mtx_lock_flags(a->uz_lockptr, MTX_DUPOK);
 	}
 }
 
@@ -2267,7 +2267,7 @@ keg_fetch_slab(uma_keg_t keg, uma_zone_t zone, int flags)
 	uma_slab_t slab;
 	u_int reserve;
 
-	mtx_assert(&keg->uk_lock, MA_OWNED);
+	uma_mtx_assert(&keg->uk_lock, MA_OWNED);
 	slab = NULL;
 	reserve = 0;
 	if ((flags & M_USE_RESERVE) == 0)
@@ -2312,7 +2312,7 @@ keg_fetch_slab(uma_keg_t keg, uma_zone_t zone, int flags)
 			if (flags & M_NOWAIT)
 				break;
 			zone->uz_sleeps++;
-			mtx_sleep(&keg->uk_cond, &keg->uk_lock);
+			uma_mtx_sleep(&keg->uk_cond, &keg->uk_lock);
 			continue;
 		}
 		slab = keg_alloc_slab(keg, zone, flags);
@@ -2428,7 +2428,7 @@ zone_fetch_slab_multi(uma_zone_t zone, uma_keg_t last, int rflags)
 			zone->uz_sleeps++;
 			zone_log_warning(zone);
 			zone_maxaction(zone);
-			mtx_sleep(&zone->uz_cond, zone->uz_lockptr);
+			uma_mtx_sleep(&zone->uz_cond, zone->uz_lockptr);
 			zone->uz_flags &= ~UMA_ZFLAG_FULL;
 			ZONE_UNLOCK(zone);
 			continue;
@@ -2444,7 +2444,7 @@ slab_alloc_item(uma_keg_t keg, uma_slab_t slab)
 	uint8_t freei;
 
 	MPASS(keg == slab->us_keg);
-	mtx_assert(&keg->uk_lock, MA_OWNED);
+	uma_mtx_assert(&keg->uk_lock, MA_OWNED);
 
 	freei = BIT_FFS(SLAB_SETSIZE, &slab->us_free) - 1;
 	BIT_CLR(SLAB_SETSIZE, freei, &slab->us_free);
@@ -2765,7 +2765,7 @@ slab_free_item(uma_keg_t keg, uma_slab_t slab, void *item)
 {
 	uint8_t freei;
 
-	mtx_assert(&keg->uk_lock, MA_OWNED);
+	uma_mtx_assert(&keg->uk_lock, MA_OWNED);
 	MPASS(keg == slab->us_keg);
 
 	/* Do we need to remove from any lists? */
