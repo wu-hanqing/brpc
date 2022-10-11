@@ -4,3 +4,8 @@ build --copt -DHAVE_ZLIB=1
 build -c opt
 # unittest 
 test --define=unittest=true
+
+build --define=with_glog=true --define=libunwind=true
+build --copt -DHAVE_ZLIB=1 --copt -DGFLAGS_NS=google --copt -DUSE_BTHREAD_MUTEX
+build --cxxopt -Wno-error=format-security
+build --linkopt -L/usr/local/ucx/lib

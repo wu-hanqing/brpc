@@ -8,7 +8,7 @@ export UCX_TLS=rc_mlx5
     --use_ucp=true \
     --thread_num=${concurrency} \
     --use_bthread=true \
-    --attachment_size=16384
+    --attachment_size=0
 
 # ./client --server="10.187.0.6:8002,10.187.0.4:8002,10.187.0.41:8002" \
 #     --thread_num=${concurrency} \

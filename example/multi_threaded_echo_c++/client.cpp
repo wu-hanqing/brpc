@@ -49,12 +49,21 @@ bvar::LatencyRecorder g_latency_recorder("client");
 // bvar::PerSecond<decltype(g_total_bytes)> g_bps(&g_total_bytes, 1);
 bvar::Adder<int> g_error_count("client_error_count");
 
-std::vector<std::unique_ptr<brpc::Channel>> channels;
+// std::vector<std::unique_ptr<brpc::Channel>> channels;
+
+using ChannelVec = std::vector<std::unique_ptr<brpc::Channel>>;
+
+bool build_channels(ChannelVec* channels);
 
 static void* sender(void* arg) {
     // Normally, you should not call a Channel directly, but instead construct
     // a stub Service wrapping it. stub can be shared by all threads as well.
     // example::EchoService_Stub stub(static_cast<google::protobuf::RpcChannel*>(arg));
+
+    ChannelVec channels;
+    if (!build_channels(&channels)) {
+        LOG(FATAL) << "init channels failed";
+    }
 
     unsigned int seed = pthread_self();
 
@@ -95,7 +104,7 @@ static void* sender(void* arg) {
     return NULL;
 }
 
-bool build_channels() {
+bool build_channels(ChannelVec* channels) {
     butil::StringSplitter sp(FLAGS_server.c_str(), ',');
     for (; sp; ++sp) {
         auto channel = std::unique_ptr<brpc::Channel>(new brpc::Channel{});
@@ -113,11 +122,11 @@ bool build_channels() {
         butil::StringPiece ip_port{sp.field(), sp.length()};
         if (channel->Init(ip_port.as_string().c_str(), &options) != 0) {
             LOG(ERROR) << "Failed to initialize channel, server = " << ip_port;
-            channels.clear();
+            channels->clear();
             return false;
         }
 
-        channels.push_back(std::move(channel));
+        channels->push_back(std::move(channel));
     }
 
     return true;
@@ -147,9 +156,9 @@ int main(int argc, char* argv[]) {
     //     return -1;
     // }
 
-    if (!build_channels()) {
-        return -1;
-    }
+    // if (!build_channels()) {
+    //     return -1;
+    // }
 
     if (FLAGS_attachment_size > 0) {
         g_attachment.resize(FLAGS_attachment_size, 'a');
