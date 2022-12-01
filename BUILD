@@ -321,6 +321,7 @@ cc_library(
     deps = [
         "@com_google_protobuf//:protobuf",
         "@com_github_gflags_gflags//:gflags",
+        "@ucx//:ucp",
     ] + select({
         ":with_glog": ["@com_github_google_glog//:glog"],
         ":darwin": [":macos_lib"],

@@ -19,7 +19,7 @@ COPTS = [
 proto_library(
     name = "echo_c++_proto",
     srcs = [
-        "echo_c++/echo.proto",
+        "multi_threaded_echo_c++/echo.proto",
     ],
 )
 
@@ -30,13 +30,73 @@ cc_proto_library(
     ],
 )
 
+# cc_binary(
+#     name = "echo_c++_server",
+#     srcs = [
+#         "echo_c++/server.cpp",
+#     ],
+#     includes = [
+#         "echo_c++",
+#     ],
+#     deps = [
+#         ":cc_echo_c++_proto",
+#         "//:brpc",
+#     ],
+#     copts = COPTS,
+# )
+
+# cc_binary(
+#     name = "echo_c++_client",
+#     srcs = [
+#         "echo_c++/client.cpp",
+#     ],
+#     includes = [
+#         "echo_c++",
+#     ],
+#     deps = [
+#         ":cc_echo_c++_proto",
+#         "//:brpc",
+#     ],
+#     copts = COPTS,
+# )
+
+# cc_binary(
+#     name = "echo_c++_unix_server",
+#     srcs = [
+#         "echo_c++_unix_socket/server.cpp",
+#     ],
+#     includes = [
+#         "echo_c++",
+#     ],
+#     deps = [
+#         ":cc_echo_c++_proto",
+#         "//:brpc",
+#     ],
+#     copts = COPTS,
+# )
+
+# cc_binary(
+#     name = "echo_c++_unix_client",
+#     srcs = [
+#         "echo_c++_unix_socket/client.cpp",
+#     ],
+#     includes = [
+#         "echo_c++",
+#     ],
+#     deps = [
+#         ":cc_echo_c++_proto",
+#         "//:brpc",
+#     ],
+#     copts = COPTS,
+# )
+
 cc_binary(
-    name = "echo_c++_server",
+    name = "mt_echo_c++_client",
     srcs = [
-        "echo_c++/server.cpp",
+        "multi_threaded_echo_c++/client.cpp",
     ],
     includes = [
-        "echo_c++",
+        "multi_threaded_echo_c++",
     ],
     deps = [
         ":cc_echo_c++_proto",
@@ -46,42 +106,12 @@ cc_binary(
 )
 
 cc_binary(
-    name = "echo_c++_client",
+    name = "mt_echo_c++_server",
     srcs = [
-        "echo_c++/client.cpp",
+        "multi_threaded_echo_c++/server.cpp",
     ],
     includes = [
-        "echo_c++",
-    ],
-    deps = [
-        ":cc_echo_c++_proto",
-        "//:brpc",
-    ],
-    copts = COPTS,
-)
-
-cc_binary(
-    name = "echo_c++_unix_server",
-    srcs = [
-        "echo_c++_unix_socket/server.cpp",
-    ],
-    includes = [
-        "echo_c++",
-    ],
-    deps = [
-        ":cc_echo_c++_proto",
-        "//:brpc",
-    ],
-    copts = COPTS,
-)
-
-cc_binary(
-    name = "echo_c++_unix_client",
-    srcs = [
-        "echo_c++_unix_socket/client.cpp",
-    ],
-    includes = [
-        "echo_c++",
+        "multi_threaded_echo_c++",
     ],
     deps = [
         ":cc_echo_c++_proto",

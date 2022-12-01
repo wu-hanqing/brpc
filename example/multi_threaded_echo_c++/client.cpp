@@ -47,10 +47,32 @@ bvar::Adder<int> g_error_count("client_error_count");
 static void* sender(void* arg) {
     // Normally, you should not call a Channel directly, but instead construct
     // a stub Service wrapping it. stub can be shared by all threads as well.
-    example::EchoService_Stub stub(static_cast<google::protobuf::RpcChannel*>(arg));
+    // example::EchoService_Stub stub(static_cast<google::protobuf::RpcChannel*>(arg));
 
     int log_id = 0;
     while (!brpc::IsAskedToQuit()) {
+        bthread_usleep(5ULL * 1000 * 1000);
+
+        brpc::Channel channel;
+        brpc::ChannelOptions opts;
+        if (FLAGS_enable_ssl) {
+            opts.mutable_ssl_options();
+        }
+
+        opts.protocol = FLAGS_protocol;
+        opts.connection_type = FLAGS_connection_type;
+        opts.connect_timeout_ms = std::min(FLAGS_timeout_ms / 2, 100);
+        opts.timeout_ms = FLAGS_timeout_ms;
+        opts.max_retry = FLAGS_max_retry;
+        opts.use_ucp = FLAGS_use_ucp;
+        if (channel.Init(FLAGS_server.c_str(), FLAGS_load_balancer.c_str(),
+                         &opts) != 0) {
+            LOG(ERROR) << "Fail to initialize channel";
+            return nullptr;
+        }
+
+        example::EchoService_Stub stub(&channel);
+
         // We will receive response synchronously, safe to put variables
         // on stack.
         example::EchoRequest request;
