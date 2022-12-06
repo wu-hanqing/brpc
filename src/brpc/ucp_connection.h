@@ -176,7 +176,8 @@ private:
 
     mutable bthread::v2::bthread_rwlock_t mutex_;
 
-    UcpCm *cm_;
+    // rarely changed data
+    UcpCm *cm_ BAIDU_CACHELINE_ALIGNMENT;
     UcpWorker *worker_;
     ucp_ep_h ep_;
     butil::atomic<ucs_status_t> ucp_code_;
@@ -185,7 +186,6 @@ private:
     bool socket_id_set_;
     bool conn_was_reset_;
     int state_;
-    butil::IOPortal in_buf_;
     // Cached remote address
     butil::EndPoint remote_side_;
     std::string remote_side_str_;
@@ -195,6 +195,9 @@ private:
     bthread::Mutex ping_mutex_;
     bthread::ConditionVariable ping_cond_;
     int ping_seq_;
+
+    // Accessed by brpc receiver thread
+    butil::IOPortal in_buf_ BAIDU_CACHELINE_ALIGNMENT;
 
     // Accessed by brpc sender thread
     mutable bthread::Mutex send_mutex_;
