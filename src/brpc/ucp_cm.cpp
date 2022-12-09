@@ -178,7 +178,6 @@ int UcpCm::Connect(const butil::EndPoint &peer)
 int UcpCm::DoConnect(const ConnectionOptions& opts)
 {
     UcpWorker *worker = pool_->GetWorker();
-    UcpConnectionRef conn;
     struct stat st;
     int fds[2];
     int saved_errno;
@@ -200,7 +199,11 @@ int UcpCm::DoConnect(const ConnectionOptions& opts)
         return -1;
     }
  
-    conn.reset(new UcpConnection(this, worker));
+    // We allocate object by operator new which is aligned to cache line,
+    // don't use make_shared
+    UcpConnection *conn_ptr = new UcpConnection(this, worker);
+    UcpConnectionRef conn(conn_ptr);
+    conn->this_ptr_ = std::weak_ptr<UcpConnection>(conn);
 
     Fd0Item item0;
     Fd1Item item1;

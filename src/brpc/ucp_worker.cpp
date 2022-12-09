@@ -274,7 +274,8 @@ void UcpWorker::AddConnection(UcpConnection *conn)
     if (!butil::pctrie_lookup(&conn_map_, (uintptr_t)conn->ep_)) {
         butil::pctrie_insert(&conn_map_, (uintptr_t *)&conn->ep_,
             alloc_trie_node);
-        conn->get(); // increase reference count
+        // increase reference count
+        conn_aux_map_.insert({conn->ep_, conn->shared_from_this()});
     }
 }
 
@@ -285,7 +286,8 @@ void UcpWorker::RemoveConnection(const ucp_ep_h ep)
         UcpConnection *conn = ucs_container_of(p, UcpConnection, ep_);
         CHECK(ep == conn->ep_) << "inconsistent member field ep_";
         butil::pctrie_remove(&conn_map_, (uintptr_t)ep, free_trie_node);
-        conn->put(); // decrease reference count
+        // decrease reference count
+        conn_aux_map_.erase(ep);
     }
 }
 
@@ -294,7 +296,7 @@ UcpConnectionRef UcpWorker::FindConnection(const ucp_ep_h ep)
     auto p = butil::pctrie_lookup(&conn_map_, (uintptr_t)ep);
     if (p != NULL) {
         UcpConnection *conn = ucs_container_of(p, UcpConnection, ep_);
-        return UcpConnectionRef(conn);
+        return conn->shared_from_this();
     }
     return UcpConnectionRef();
 }
@@ -994,7 +996,7 @@ void UcpWorker::ErrorCallback(void *arg, ucp_ep_h ep, ucs_status_t status)
     w->SetDataReadyLocked(conn);
 }
 
-void UcpWorker::CancelRequests(const UcpConnectionRef &conn)
+void UcpWorker::CancelRequests(UcpConnection *conn)
 {
     UcpAmMsg *msg, *next = NULL;
 
@@ -1010,7 +1012,7 @@ void UcpWorker::CancelRequests(const UcpConnectionRef &conn)
 }
 
 // Release the connection object indexed by ep, and gracefully disconnect it
-void UcpWorker::Release(UcpConnectionRef conn)
+void UcpWorker::Release(UcpConnection *conn)
 {
     ucs_status_ptr_t request;
     ucp_ep_h ep = conn->ep_;
@@ -1042,7 +1044,7 @@ void UcpWorker::Release(UcpConnectionRef conn)
     ExitingEp e;
     e.ep = ep;
     e.req = request;
-    e.conn = conn;
+    e.conn = conn->shared_from_this();
     exiting_ep_.push_back(e);
     MaybeWakeup();
 }
@@ -1112,17 +1114,17 @@ void UcpWorker::DispatchDataReady()
     mutex_.lock();
 }
 
-void UcpWorker::SetDataReady(const UcpConnectionRef& conn)
+void UcpWorker::SetDataReady(UcpConnection* conn)
 {
     BAIDU_SCOPED_LOCK(mutex_);
 
     SetDataReadyLocked(conn);
 }
 
-void UcpWorker::SetDataReadyLocked(const UcpConnectionRef &conn)
+void UcpWorker::SetDataReadyLocked(UcpConnection *conn)
 {
     if (!conn->data_ready_flag_) {
-        data_ready_.push(conn);
+        data_ready_.push(conn->shared_from_this());
         conn->data_ready_flag_ = true;
         MaybeWakeup();
     }
@@ -1280,7 +1282,7 @@ ssize_t UcpWorker::StartSend(int cmd, UcpConnection *conn,
         header.pad = to_pad;
         header.sn = conn->next_send_sn_;
         MsgHeaderOut(&header, &msg->header);
-        msg->conn = conn;
+        msg->conn = conn->shared_from_this();
 
         total += msg->buf.length();
         batch[batch_num++] = msg;

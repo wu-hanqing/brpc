@@ -62,7 +62,6 @@ private:
     class PongHandler;
     class HelloHandler;
     class HelloReplyHandler;
-
     int Initialize();
     int Accept(UcpConnection *conn, ucp_conn_request_h req);
     int Connect(UcpConnection *conn,  const butil::EndPoint &peer);
@@ -72,7 +71,7 @@ private:
     static void *RunEventThread(void *arg);
     void DoRunWorker();
     void DoRunEventLoop();
-    void Release(UcpConnectionRef ref);
+    void Release(UcpConnection *ref);
     void InvokeExternalEvents();
     void CheckExitingEp();
     ssize_t StartRecv(UcpConnection *conn);
@@ -81,8 +80,14 @@ private:
     ssize_t StartSend(int cmd, UcpConnection *conn, butil::IOBuf * const buf[],
         size_t const attachment_off_list[], int ndata);
     void DispatchDataReady();
-    void SetDataReady(const UcpConnectionRef & conn);
-    void SetDataReadyLocked(const UcpConnectionRef & conn);
+    void SetDataReady(UcpConnection *conn);
+    void SetDataReadyLocked(UcpConnection *conn);
+    void SetDataReady(const UcpConnectionRef &conn) {
+        SetDataReady(conn.get());
+    }
+    void SetDataReadyLocked(const UcpConnectionRef &conn) {
+        SetDataReadyLocked(conn.get());
+    }
     static ucs_status_t AmCallback(void *arg,
         const void *header, size_t header_length, void *data, size_t length,
         const ucp_am_recv_param_t *param);
@@ -105,7 +110,7 @@ private:
     void RecycleWorkerData();
     void SendRequest(brpc::UcpAmSendInfo* [], int size);
     bool KeepSendRequest(void);
-    void CancelRequests(const UcpConnectionRef &ref);
+    void CancelRequests(UcpConnection *conn);
     void SaveInputMessage(const UcpConnectionRef &conn, UcpAmMsg *msg);
     void MergeInputMessage(UcpConnection *conn);
     void HandlePing(const UcpConnectionRef &conn, UcpAmMsg *msg);
@@ -128,6 +133,7 @@ private:
     // Worker id
     int id_;
     butil::pctrie conn_map_;
+    std::map<ucp_ep_h, UcpConnectionRef> conn_aux_map_;
     struct ExitingEp {
         int magic;
         ucp_ep_h ep;

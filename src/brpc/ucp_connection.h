@@ -22,7 +22,6 @@
 #include "butil/intrusive_ptr.hpp"
 #include "butil/atomicops.h"
 #include "butil/iobuf.h"
-#include "butil/refcountedobj.h"
 #include "butil/resource_pool.h"
 #include "bthread/mutex.h"
 #include "bthread/rwlock_v2.h"
@@ -31,6 +30,7 @@
 #include <ucp/api/ucp.h>
 #include <sys/queue.h>
 #include <assert.h>
+#include <memory>
 #include <vector>
 
 namespace brpc {
@@ -39,7 +39,7 @@ class UcpCm;
 class UcpWorker;
 class UcpConnection;
 
-typedef butil::intrusive_ptr<UcpConnection> UcpConnectionRef;
+typedef std::shared_ptr<UcpConnection> UcpConnectionRef;
 
 enum {
     UCP_VER_0
@@ -137,7 +137,7 @@ private:
     friend class butil::ResourcePool<UcpAmSendInfo>;
 };
 
-class UcpConnection : public butil::RefCountedObject {
+class UcpConnection {
 public:
     UcpConnection(UcpCm* cm, UcpWorker *w);
     virtual ~UcpConnection();
@@ -153,6 +153,10 @@ public:
 
     void *operator new(size_t);
     void operator delete(void *);
+
+    std::shared_ptr<UcpConnection> shared_from_this() const {
+        return this_ptr_.lock();
+    }
 
 private:
     void Open();
@@ -177,7 +181,8 @@ private:
     mutable bthread::v2::bthread_rwlock_t mutex_;
 
     // rarely changed data
-    UcpCm *cm_ BAIDU_CACHELINE_ALIGNMENT;
+    std::weak_ptr<UcpConnection> this_ptr_ BAIDU_CACHELINE_ALIGNMENT;
+    UcpCm *cm_;
     UcpWorker *worker_;
     ucp_ep_h ep_;
     butil::atomic<ucs_status_t> ucp_code_;
