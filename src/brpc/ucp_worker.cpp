@@ -25,6 +25,7 @@
 #include <endian.h>
 #include <limits.h>
 #include <poll.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <sys/param.h>
 #include <sys/time.h>
@@ -521,7 +522,7 @@ again:
             if (timercmp(&tv_now, &tv_end, <)) {
                 if (BAIDU_UNLIKELY(FLAGS_brpc_ucp_worker_poll_yield &&
                     count >= FLAGS_brpc_ucp_worker_poll_yield)) {
-                    pthread_yield();
+                    sched_yield();
                 }
                 goto again;
             }
