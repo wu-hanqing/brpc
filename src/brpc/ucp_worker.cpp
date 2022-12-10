@@ -1341,22 +1341,22 @@ bool UcpWorker::SendHello(UcpConnection *conn)
 
 void UcpWorker::HandlePing(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(new PingHandler(conn, msg));
+    DispatchExternalEventLocked(std::make_shared<PingHandler>(conn, msg));
 }
 
 void UcpWorker::HandlePong(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(new PongHandler(conn, msg));
+    DispatchExternalEventLocked(std::make_shared<PongHandler>(conn, msg));
 }
 
 void UcpWorker::HandleHello(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(new HelloHandler(conn, msg));
+    DispatchExternalEventLocked(std::make_shared<HelloHandler>(conn, msg));
 }
 
 void UcpWorker::HandleHelloReply(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(new HelloReplyHandler(conn, msg));
+    DispatchExternalEventLocked(std::make_shared<HelloReplyHandler>(conn, msg));
 }
 
 } // namespace brpc
