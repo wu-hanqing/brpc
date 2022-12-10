@@ -31,6 +31,7 @@
 #include <sys/time.h>
 
 #include <ios>
+#include <utility>
 
 #define AM_ID  0
 
@@ -623,7 +624,6 @@ ucs_status_t UcpWorker::DoAmCallback(
         SetDataReadyLocked(conn);
         return UCS_OK;
     }
-    msg->conn = conn;
     MsgHeaderIn(&msg->header, mh);
     msg->data = data;
     msg->length = length;
@@ -631,6 +631,7 @@ ucs_status_t UcpWorker::DoAmCallback(
         msg->set_flag(AMF_RNDV);
     }
     msg->set_flag(AMF_MSG_Q);
+    msg->conn = std::move(conn);
     TAILQ_INSERT_TAIL(&msg_q_, msg, link);
 
     return UCS_INPROGRESS;
