@@ -102,8 +102,7 @@ panic(const char *fmt, ...)
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
     flockfile(stderr);
-    fprintf(stderr, buf);
-    fprintf(stderr, "\n");
+    fprintf(stderr, "%s\n", buf);
     funlockfile(stderr);
     abort();
 }
