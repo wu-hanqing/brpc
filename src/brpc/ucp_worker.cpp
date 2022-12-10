@@ -21,7 +21,6 @@
 #include "butil/logging.h"
 #include "butil/pctrie.h"
 
-#include <ucs/sys/sock.h>
 #include <gflags/gflags.h>
 #include <endian.h>
 #include <limits.h>
