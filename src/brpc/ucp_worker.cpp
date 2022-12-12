@@ -421,7 +421,7 @@ void UcpWorker::MaybeWakeup()
     }
 }
 
-void UcpWorker::DispatchExternalEvent(EventCallbackRef e)
+void UcpWorker::DispatchExternalEvent(EventCallback *e)
 {
     mutex_.lock();
     external_events_.push_back(e);
@@ -429,7 +429,7 @@ void UcpWorker::DispatchExternalEvent(EventCallbackRef e)
     MaybeWakeup();
 }
 
-void UcpWorker::DispatchExternalEventLocked(EventCallbackRef e)
+void UcpWorker::DispatchExternalEventLocked(EventCallback *e)
 {
     external_events_.push_back(e);
     MaybeWakeup();
@@ -442,8 +442,10 @@ void UcpWorker::InvokeExternalEvents()
         auto e = external_events_.front();
         external_events_.pop_front();
         mutex_.unlock();
-        if (e)
+        if (e) {
             e->do_request(0);
+            delete e;
+        }
         // e is destructed here
         mutex_.lock();
     }
@@ -1341,22 +1343,22 @@ bool UcpWorker::SendHello(UcpConnection *conn)
 
 void UcpWorker::HandlePing(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(std::make_shared<PingHandler>(conn, msg));
+    DispatchExternalEventLocked(new PingHandler(conn, msg));
 }
 
 void UcpWorker::HandlePong(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(std::make_shared<PongHandler>(conn, msg));
+    DispatchExternalEventLocked(new PongHandler(conn, msg));
 }
 
 void UcpWorker::HandleHello(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(std::make_shared<HelloHandler>(conn, msg));
+    DispatchExternalEventLocked(new HelloHandler(conn, msg));
 }
 
 void UcpWorker::HandleHelloReply(const UcpConnectionRef &conn, UcpAmMsg *msg)
 {
-    DispatchExternalEventLocked(std::make_shared<HelloReplyHandler>(conn, msg));
+    DispatchExternalEventLocked(new HelloReplyHandler(conn, msg));
 }
 
 } // namespace brpc

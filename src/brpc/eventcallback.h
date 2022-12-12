@@ -17,16 +17,13 @@
 #ifndef BRPC_EVENTCALLBACK_H
 #define BRPC_EVENTCALLBACK_H
 
-#include <memory>
-
 namespace brpc {
 
 class EventCallback {
 public:
+    virtual ~EventCallback() {}
     virtual void do_request(int fd_or_id) = 0;
 };
-
-typedef std::shared_ptr<EventCallback> EventCallbackRef;
 
 } // namespace brpc
 #endif

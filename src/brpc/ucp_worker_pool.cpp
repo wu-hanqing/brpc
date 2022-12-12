@@ -81,7 +81,7 @@ void UcpWorkerPool::Barrier()
     for (auto it = workers_.begin(); it != workers_.end(); ++it) {
         cur = cur;
         assert(cur != (*it)->Owner());
-        (*it)->DispatchExternalEvent(EventCallbackRef(new C_barrier(this)));
+        (*it)->DispatchExternalEvent(new C_barrier(this));
         barrier_count_++;
     }
     while (barrier_count_)

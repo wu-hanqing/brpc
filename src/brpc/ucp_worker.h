@@ -51,7 +51,7 @@ public:
     Status status() const { return status_; }
     void Wakeup();
     void MaybeWakeup();
-    void DispatchExternalEvent(EventCallbackRef e);
+    void DispatchExternalEvent(EventCallback *e);
     pthread_t Owner() const { return worker_tid_; }
 
     void * operator new(size_t);
@@ -117,7 +117,8 @@ private:
     void HandlePong(const UcpConnectionRef &conn, UcpAmMsg *msg);
     void HandleHello(const UcpConnectionRef &conn, UcpAmMsg *msg);
     void HandleHelloReply(const UcpConnectionRef &conn, UcpAmMsg *msg);
-    void DispatchExternalEventLocked(EventCallbackRef e);
+    void DispatchExternalEventLocked(EventCallback *e);
+    void DispatchCallback();
 
     void AddConnection(UcpConnection *conn);
     void RemoveConnection(const ucp_ep_h ep);
@@ -128,7 +129,7 @@ private:
     butil::IOBuf pad_buf_;
     bthread::Mutex mutex_ BAIDU_CACHELINE_ALIGNMENT;
 
-    std::list<EventCallbackRef> external_events_;
+    std::list<EventCallback *> external_events_;
     Status status_;
     // Worker id
     int id_;
