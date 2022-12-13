@@ -152,6 +152,7 @@ UcpConnection::~UcpConnection()
 
 void *UcpConnection::operator new(size_t size)
 {
+    size = roundup(size, BAIDU_CACHELINE_SIZE);
     return ::aligned_alloc(BAIDU_CACHELINE_SIZE, size);
 }
 
