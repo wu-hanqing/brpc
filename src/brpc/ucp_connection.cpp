@@ -36,7 +36,13 @@ DEFINE_int32(brpc_ucp_ping_timeout, 10, "Number of seconds");
 DEFINE_uint32(brpc_ucp_iov_reserve, 64, "Number of iov elements are cached");
 
 bthread_attr_t ucp_consumer_thread_attr = BTHREAD_ATTR_NORMAL;
-static bvar::Adder<int> g_ucp_conn("ucp_connection_count");
+
+static bvar::Adder<int> *g_ucp_conn_impl =
+        new bvar::Adder<int>("ucp_connection_count");
+
+static bvar::Adder<int> &g_ucp_conn() {
+    return *g_ucp_conn_impl;
+}
 
 static uma_zone_t am_msg_zone;
 static uma_zone_t am_send_info_zone;
@@ -162,7 +168,7 @@ UcpConnection::UcpConnection(UcpCm *cm, UcpWorker *w)
     TAILQ_INIT(&recv_q_);
     TAILQ_INIT(&send_q_);
     next_send_sn_ = 0;
-    g_ucp_conn << 1;
+    g_ucp_conn() << 1;
 }
 
 UcpConnection::~UcpConnection()
@@ -177,7 +183,7 @@ UcpConnection::~UcpConnection()
     }
     bthread_rwlock_destroy(&mutex_);
     DLOG(INFO) << __func__ << " " << this;
-    g_ucp_conn << -1;
+    g_ucp_conn() << -1;
 }
 
 void *UcpConnection::operator new(size_t size)
