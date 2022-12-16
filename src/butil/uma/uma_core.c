@@ -252,8 +252,7 @@ void uma_print_stats(void);
 
 static inline void *uma_mmap(vm_size_t bytes)
 {
-	return mmap(NULL, bytes, PROT_READ | PROT_WRITE,
-		MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    return valloc(bytes);
 }
 
 static int zone_warnings = 1;
@@ -1038,7 +1037,7 @@ page_alloc(uma_zone_t zone, vm_size_t bytes, uint8_t *pflag, int wait)
 static void
 page_free(void *mem, vm_size_t size, uint8_t flags)
 {
-	munmap(mem, size);
+    free(mem);
 }
 
 /*
