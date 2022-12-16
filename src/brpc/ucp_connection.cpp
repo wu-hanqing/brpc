@@ -19,6 +19,7 @@
 #include "brpc/ucp_worker.h"
 #include "brpc/socket.h"
 #include "bvar/bvar.h"
+#include "butil/uma/uma/uma.h"
 
 #include <gflags/gflags.h>
 #include <ucs/datastruct/list.h>
@@ -37,6 +38,16 @@ DEFINE_uint32(brpc_ucp_iov_reserve, 64, "Number of iov elements are cached");
 bthread_attr_t ucp_consumer_thread_attr = BTHREAD_ATTR_NORMAL;
 static bvar::Adder<int> g_ucp_conn("ucp_connection_count");
 
+static uma_zone_t am_msg_zone;
+static uma_zone_t am_send_info_zone;
+
+BAIDU_GLOBAL_INIT() {
+    am_msg_zone = uma_zcreate("ucp::am_msg", sizeof(UcpAmMsg),
+         NULL, NULL, UcpAmMsg::init, UcpAmMsg::fini, UMA_ALIGN_PTR, 0);
+    am_send_info_zone = uma_zcreate("ucp::am_send_info", sizeof(UcpAmSendInfo),
+         NULL, NULL, UcpAmSendInfo::init, UcpAmSendInfo::fini, UMA_ALIGN_PTR, 0);
+}
+
 UcpAmMsg::UcpAmMsg()
 {
     header.init();
@@ -48,12 +59,21 @@ UcpAmMsg::UcpAmMsg()
     flags = 0;
 }
 
+int UcpAmMsg::init(void *mem, int size, int flags)
+{
+    new (mem) UcpAmMsg;
+    return 0;
+}
+
+void UcpAmMsg::fini(void *mem, int size)
+{
+    UcpAmMsg *msg = static_cast<UcpAmMsg *>(mem);
+    msg->UcpAmMsg::~UcpAmMsg();
+}
+
 UcpAmMsg *UcpAmMsg::Allocate(void)
 {
-    butil::ResourceId<UcpAmMsg> id;
-    auto o = butil::get_resource<UcpAmMsg>(&id);
-    o->id = id;
-    return o;
+    return (UcpAmMsg *)uma_zalloc(am_msg_zone, 0);   
 }
 
 void UcpAmMsg::Release(UcpAmMsg *o)
@@ -78,7 +98,7 @@ void UcpAmMsg::Release(UcpAmMsg *o)
         o->iov.resize(FLAGS_brpc_ucp_iov_reserve);
         o->iov.shrink_to_fit();
     }
-    butil::return_resource<UcpAmMsg>(o->id);
+    uma_zfree(am_msg_zone, o);
 }
 
 UcpAmSendInfo::UcpAmSendInfo()
@@ -89,12 +109,21 @@ UcpAmSendInfo::UcpAmSendInfo()
     nvec = 0;
 }
 
+int UcpAmSendInfo::init(void *mem, int size, int flags)
+{
+    new (mem) UcpAmSendInfo;
+    return 0;
+}
+
+void UcpAmSendInfo::fini(void *mem, int size)
+{
+    UcpAmSendInfo *info = static_cast<UcpAmSendInfo *>(mem);
+    info->UcpAmSendInfo::~UcpAmSendInfo();
+}
+
 UcpAmSendInfo *UcpAmSendInfo::Allocate(void)
 {
-    butil::ResourceId<UcpAmSendInfo> id;
-    auto o = butil::get_resource<UcpAmSendInfo>(&id);
-    o->id = id;
-    return o;
+    return (UcpAmSendInfo *)uma_zalloc(am_send_info_zone, 0);   
 }
 
 void UcpAmSendInfo::Release(UcpAmSendInfo *o)
@@ -109,7 +138,8 @@ void UcpAmSendInfo::Release(UcpAmSendInfo *o)
         o->iov.resize(FLAGS_brpc_ucp_iov_reserve);
         o->iov.shrink_to_fit();
     }
-    butil::return_resource<UcpAmSendInfo>(o->id);
+
+    uma_zfree(am_send_info_zone, o);
 }
 
 UcpConnection::UcpConnection(UcpCm *cm, UcpWorker *w)

@@ -110,6 +110,9 @@ struct UcpAmMsg {
     static UcpAmMsg *Allocate(void);
     static void Release(UcpAmMsg *o);
 
+    static int  init(void *mem, int size, int flags);
+    static void fini(void *mem, int size);
+
 private:
     UcpAmMsg();
     void operator delete( void * ) {}
@@ -130,6 +133,9 @@ struct UcpAmSendInfo {
 
     static UcpAmSendInfo *Allocate(void);
     static void Release(UcpAmSendInfo *o);
+
+    static int init(void *mem, int size, int flags);
+    static void fini(void *mem, int size);
 
 private:
     UcpAmSendInfo();
