@@ -59,6 +59,16 @@ DEFINE_int32(rdma_prepared_qp_cnt, 1024, "Initial count of prepared QP.");
 DEFINE_bool(rdma_trace_verbose, false, "Print log message verbosely");
 BRPC_VALIDATE_GFLAG(rdma_trace_verbose, brpc::PassValidate);
 
+static bool ValidateRdmaTrafficClass(const char* flagname, int32_t value) {
+    if (value < 0 || value > std::numeric_limits<uint8_t>::max()) {
+        LOG(ERROR) << "Invalid value for `" << flagname << "' " << value;
+        return false;
+    }
+    return true;
+}
+DEFINE_int32(rdma_traffic_class, 0, "Traffic class for RDMA");
+BRPC_VALIDATE_GFLAG(rdma_traffic_class, ValidateRdmaTrafficClass);
+
 static const size_t IOBUF_BLOCK_HEADER_LEN = 32; // implementation-dependent
 static const size_t IOBUF_BLOCK_DEFAULT_PAYLOAD =
         butil::IOBuf::DEFAULT_BLOCK_SIZE - IOBUF_BLOCK_HEADER_LEN;
@@ -1179,7 +1189,7 @@ int RdmaEndpoint::BringUpQp(uint16_t lid, ibv_gid gid, uint32_t qp_num) {
     attr.ah_attr.grh.flow_label = 0;
     attr.ah_attr.grh.sgid_index = GetRdmaGidIndex();
     attr.ah_attr.grh.hop_limit = MAX_HOP_LIMIT;
-    attr.ah_attr.grh.traffic_class = 0;
+    attr.ah_attr.grh.traffic_class = FLAGS_rdma_traffic_class;
     attr.ah_attr.dlid = lid;
     attr.ah_attr.sl = 0;
     attr.ah_attr.src_path_bits = 0;
