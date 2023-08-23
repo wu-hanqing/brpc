@@ -1,0 +1,73 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_proto_library")
+
+COPTS = [
+    "-D__STDC_FORMAT_MACROS",
+    "-DBTHREAD_USE_FAST_PTHREAD_MUTEX",
+    "-D__const__=__unused__",
+    "-D_GNU_SOURCE",
+    "-DUSE_SYMBOLIZE",
+    "-DNO_TCMALLOC",
+    "-D__STDC_LIMIT_MACROS",
+    "-D__STDC_CONSTANT_MACROS",
+    "-fPIC",
+    "-Wno-unused-parameter",
+    "-fno-omit-frame-pointer",
+    "-DGFLAGS_NS=google",
+] + select({
+    "//bazel/config:brpc_with_glog": ["-DBRPC_WITH_GLOG=1"],
+    "//conditions:default": ["-DBRPC_WITH_GLOG=0"],
+}) + select({
+    "//bazel/config:brpc_with_rdma": ["-DBRPC_WITH_RDMA=1"],
+    "//conditions:default": [""],
+})
+
+proto_library(
+    name = "echo_proto",
+    srcs = [
+        "echo.proto",
+    ],
+)
+
+cc_proto_library(
+    name = "echo_proto_cc",
+    deps = [
+        ":echo_proto",
+    ],
+)
+
+cc_binary(
+    name = "multi_threaded_client",
+    srcs = [
+        "client.cpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//:brpc",
+        ":echo_proto_cc",
+    ]
+)
+
+cc_binary(
+    name = "multi_threaded_multi_server_client",
+    srcs = [
+        "multi_server_client.cpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//:brpc",
+        ":echo_proto_cc",
+    ]
+)
+
+cc_binary(
+    name = "multi_threaded_server",
+    srcs = [
+        "server.cpp",
+    ],
+    copts = COPTS,
+    deps = [
+        "//:brpc",
+        ":echo_proto_cc",
+    ]
+)

@@ -17,10 +17,12 @@
 
 // A server to receive EchoRequest and send back EchoResponse.
 
-#include <gflags/gflags.h>
-#include <butil/logging.h>
 #include <brpc/server.h>
-#include "echo.pb.h"
+#include <butil/logging.h>
+#include <gflags/gflags.h>
+
+#include "brpc/rdma/rdma_helper.h"
+#include "example/multi_threaded_echo_c++/echo.pb.h"
 
 DEFINE_bool(echo_attachment, true, "Echo attachment as well");
 DEFINE_int32(port, 8002, "TCP Port of this server");
@@ -28,8 +30,13 @@ DEFINE_int32(idle_timeout_s, -1, "Connection will be closed if there is no "
              "read/write operations during the last `idle_timeout_s'");
 DEFINE_int32(max_concurrency, 0, "Limit of request processing in parallel");
 DEFINE_int32(internal_port, -1, "Only allow builtin services at this port");
+DEFINE_bool(send_attachment, false, "Send attachment");
+DEFINE_int32(attachment_size, 0, "Size of attachment");
 
 namespace example {
+
+butil::IOBuf attachment;
+
 // Your implementation of EchoService
 class EchoServiceImpl : public EchoService {
 public:
@@ -47,6 +54,8 @@ public:
         response->set_message(request->message());
         if (FLAGS_echo_attachment) {
             cntl->response_attachment().append(cntl->request_attachment());
+        } else if (FLAGS_send_attachment) {
+            cntl->response_attachment().append(attachment);
         }
     }
 };
@@ -61,9 +70,17 @@ int main(int argc, char* argv[]) {
     // Parse gflags. We recommend you to use gflags as well.
     GFLAGS_NS::ParseCommandLineFlags(&argc, &argv, true);
 
+    brpc::rdma::GlobalRdmaInitializeOrDie();
+
     if (FLAGS_h) {
         fprintf(stderr, "%s\n%s\n%s", help_str.c_str(), help_str.c_str(), help_str.c_str());
         return 0;
+    }
+
+    if (FLAGS_send_attachment) {
+        char* buffer = new char[FLAGS_attachment_size];
+        example::attachment.append(buffer, FLAGS_attachment_size);
+        delete[] buffer;
     }
 
     // Generally you only need one Server.
@@ -83,8 +100,7 @@ int main(int argc, char* argv[]) {
 
     // Start the server. 
     brpc::ServerOptions options;
-    options.mutable_ssl_options()->default_cert.certificate = "cert.pem";
-    options.mutable_ssl_options()->default_cert.private_key = "key.pem";
+    options.use_rdma = true;
     options.idle_timeout_sec = FLAGS_idle_timeout_s;
     options.max_concurrency = FLAGS_max_concurrency;
     options.internal_port = FLAGS_internal_port;

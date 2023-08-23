@@ -52,8 +52,8 @@ static const int BLOCK_SIZE_COUNT = 3;
 static size_t g_block_size[BLOCK_SIZE_COUNT] = { 8192, 65536, 2 * BYTES_IN_MB };
 
 struct IdleNode {
-    void* start;
-    size_t len;
+    void* start;  // 空闲内存起始地址
+    size_t len;   // 空闲内存长度
     IdleNode* next;
 };
 
@@ -90,7 +90,7 @@ static size_t* g_tls_info[1024];
 
 // For each block size, there are some buckets of idle list to reduce race.
 struct GlobalInfo {
-    std::vector<IdleNode*> idle_list[BLOCK_SIZE_COUNT];
+    std::vector<IdleNode*> idle_list[BLOCK_SIZE_COUNT];  // 每个block size对应多个IdleNode
     std::vector<butil::Mutex*> lock[BLOCK_SIZE_COUNT];
     std::vector<size_t> idle_size[BLOCK_SIZE_COUNT];
     butil::Mutex extend_lock;
@@ -288,9 +288,9 @@ static void* AllocBlockFrom(int block_type) {
         return ptr;
     }
 
-    uint64_t index = butil::fast_rand() % g_buckets;
+    uint64_t index = butil::fast_rand() % g_buckets; 
     BAIDU_SCOPED_LOCK(*g_info->lock[block_type][index]);
-    IdleNode* node = g_info->idle_list[block_type][index];
+    IdleNode* node = g_info->idle_list[block_type][index];  // 随机选取一个idle node
     if (!node) {
         BAIDU_SCOPED_LOCK(g_info->extend_lock);
         node = g_info->idle_list[block_type][index];
@@ -365,7 +365,7 @@ void* AllocBlock(size_t size) {
         return NULL;
     }
     for (int i = 0; i < BLOCK_SIZE_COUNT; ++i) {
-        if (size <= g_block_size[i]) {
+        if (size <= g_block_size[i] /* 8K 64K 2M */) {
             return AllocBlockFrom(i);;
         }
     }

@@ -1520,7 +1520,7 @@ void Socket::CheckConnectedAndKeepWrite(int fd, int err, void* data) {
     CHECK_GE(sockfd, 0);
     if (err == 0 && s->CheckConnected(sockfd) == 0
         && s->ResetFileDescriptor(sockfd) == 0) {
-        if (s->_app_connect) {
+        if (s->_app_connect) {  // RDMA链接_app_connect是`rdma::RdmaConnect`
             s->_app_connect->StartConnect(req->socket, AfterAppConnected, req);
         } else {
             // Successfully created a connection

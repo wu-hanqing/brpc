@@ -23,6 +23,8 @@
 #include <butil/logging.h>
 #include <bvar/bvar.h>
 #include <gflags/gflags.h>
+#include <butil/strings/string_piece.h>
+#include <butil/strings/string_split.h>
 
 #include "brpc/rdma/rdma_helper.h"
 #include "example/multi_threaded_echo_c++/echo.pb.h"
@@ -36,7 +38,7 @@ DEFINE_string(protocol, "baidu_std",
               "Protocol type. Defined in src/brpc/options.proto");
 DEFINE_string(connection_type, "",
               "Connection type. Available values: single, pooled, short");
-DEFINE_string(server, "0.0.0.0:8002", "IP Address of server");
+DEFINE_string(servers, "0.0.0.0:8002;0.0.0.0:8003", "IP Address of server");
 DEFINE_string(load_balancer, "", "The algorithm for load balancing");
 DEFINE_int32(timeout_ms, 100, "RPC timeout in milliseconds");
 DEFINE_int32(max_retry, 3, "Max retries(not including the first RPC)");
@@ -52,6 +54,11 @@ bvar::Adder<int> g_error_count("client_error_count");
 bvar::Adder<int64_t> g_total_bytes("total_bytes");
 bvar::PerSecond<bvar::Adder<int64_t> > g_bps("bandwidth", &g_total_bytes, 1);
 
+bvar::Adder<int64_t> g_received_total_bytes("total_received_bytes");
+bvar::PerSecond<bvar::Adder<int64_t> > g_receive_bps("receive_bandwidth", &g_received_total_bytes, 1);
+
+std::atomic<int> g_id(0);
+
 static void* sender(void* arg) {
     brpc::ChannelOptions options;
     options.protocol = FLAGS_protocol;
@@ -60,10 +67,21 @@ static void* sender(void* arg) {
     options.max_retry = 0;
     options.use_rdma = true;
 
-    brpc::Channel channel;
-    if (channel.Init(FLAGS_server.c_str(), &options) != 0) {
-        LOG(ERROR) << "Fail to initialize channel";
-        return NULL;
+    std::vector<brpc::Channel*> channels;
+
+    std::vector<butil::StringPiece> servers;
+    butil::SplitString(FLAGS_servers, ';', &servers);
+    if (servers.empty()) {
+        CHECK(false) << "No server specified";
+    }
+
+    for (auto& svr : servers) {
+        brpc::Channel* channel = new brpc::Channel{};
+        if (channel->Init(svr.as_string().c_str(), &options) != 0) {
+            CHECK(false) << "Fail to initialize channel, error: "
+                         << strerror(errno);
+        }
+        channels.push_back(channel);
     }
 
     butil::IOBuf attachment;
@@ -74,12 +92,14 @@ static void* sender(void* arg) {
         delete[] buf;
     }
 
-    // Normally, you should not call a Channel directly, but instead construct
-    // a stub Service wrapping it. stub can be shared by all threads as well.
-    example::EchoService_Stub stub(&channel);
-
     int log_id = 0;
+    int64_t index = g_id.fetch_add(1);
     while (!brpc::IsAskedToQuit()) {
+        // Normally, you should not call a Channel directly, but instead
+        // construct a stub Service wrapping it. stub can be shared by all
+        // threads as well.
+        example::EchoService_Stub stub(channels[index++ % channels.size()]);
+
         // We will receive response synchronously, safe to put variables
         // on stack.
         example::EchoRequest request;
@@ -98,6 +118,10 @@ static void* sender(void* arg) {
         if (!cntl.Failed()) {
             g_latency_recorder << cntl.latency_us();
             g_total_bytes << FLAGS_attachment_size;
+
+            if (cntl.response_attachment().length() > 0) {
+                g_received_total_bytes << cntl.response_attachment().length();
+            }
         } else {
             g_error_count << 1;
             CHECK(brpc::IsAskedToQuit() || !FLAGS_dont_fail)
@@ -148,7 +172,8 @@ int main(int argc, char* argv[]) {
         sleep(1);
         LOG(INFO) << "Sending EchoRequest at qps=" << g_latency_recorder.qps(1)
                   << " latency=" << g_latency_recorder.latency(1)
-                  << " " << g_bps.get_value(1) / (1ULL << 20) << "MiB/s";
+                  << " " << g_bps.get_value(1) / (1ULL << 20) << "MiB/s"
+                  << " receive: " << g_receive_bps.get_value(1) / (1ULL << 20) << "MiB/s";
     }
 
     LOG(INFO) << "EchoClient is going to quit";
